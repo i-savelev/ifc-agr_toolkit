@@ -139,7 +139,7 @@ def generate_full_report(
 
 if __name__ == "__main__":
     # Пример использования
-    IFC_PATH = Path(r"samples\НН_К00_С00_АР_АГР.ifc")
+    IFC_PATH = Path(r"samples\НН_ОБ01_П00_АР_АГР.ifc")
     OUTPUT_DIR = Path(r".output")
 
     # Импортирую для тестирования
@@ -150,6 +150,6 @@ if __name__ == "__main__":
 
     spaces_df = get_spaces_dataframe(model, ifc_path=IFC_PATH, tolerance=0.1)
     problems_df = get_problem_spaces_dataframe(spaces_df)
-    tep_df = calculate_tep(model, spaces_df)
+    tep_df = calculate_tep(spaces_df)
 
     generate_full_report(IFC_PATH, OUTPUT_DIR, spaces_df, tep_df, problems_df)

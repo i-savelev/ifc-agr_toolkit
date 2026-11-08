@@ -1,7 +1,8 @@
 """Формирование ТЭП из IFC-модели ЦИМ АГР.
 
 Модуль рассчитывает ТЭП только на основе DataFrame помещений/зон.
-Данные извлекаются через публичные функции ifc_space_checker.
+Каждое поле ТЭП — отдельная функция, которая принимает DataFrame,
+фильтрует по критериям и суммирует RUS_Area (м²).
 """
 
 from __future__ import annotations
@@ -44,64 +45,175 @@ class TepValue:
 
 
 FORM_FIELDS: tuple[tuple[str, str, str, bool, str | None], ...] = (
-    ("uniqueObjectId", "Уникальный идентификационный номер (УИН)", "", False, "UniqueObjectId"),
-    ("objectName", "Наименование объекта", "", False, "ObjectName"),
-    ("registrationNumber", "Регистрационный номер", "", False, "RegistrationNumber"),
-    ("statementDate", "Дата", "", False, "Date"),
-    ("address", "Адрес", "", False, "Address"),
-    ("cadastralNumbers", "Кадастровые номера земельных участков", "", False, "CadastralNumber"),
-    ("gpzuNumbers", "Номера ГПЗУ", "", False, None),
-    ("pptNumbers", "Номера ППТ", "", False, None),
-    ("gzkPermitNumbers", "Номера решений ГЗК", "", False, None),
-    ("krtNumbers", "Номера КРТ", "", False, None),
-    ("ppmNumbers", "Номера ППМ", "", False, None),
-    ("projectOrganization", "Проектная организация", "", False, "ProjectOrganization"),
-    ("leadArchitect", "Руководитель авторского коллектива", "", False, "ProjectTeamLead"),
-    ("authorTeam", "Авторский коллектив", "", False, "Member"),
-    ("workTypes", "Виды работ", "", False, "WorkTypes"),
-    ("functionalPurposes", "Функциональные назначения объекта", "", False, "FunctionalPurpose"),
-    ("developmentHeight", "Высота застройки", "м", False, "BuildingHeight"),
-    ("landArea", "Площадь участка", "га", False, "Area"),
-    ("totalOuterArea", "Суммарная поэтажная площадь в габаритах наружных стен (всего)", "м²", False, "TotalFloorArea"),
-    ("residentialOuterArea", "Суммарная поэтажная площадь в габаритах наружных стен жилых объектов", "м²", False, "ResidentialPartArea"),
-    ("residentialLivingOuterArea", "Суммарная поэтажная площадь жилых объектов (жилая часть)", "м²", False, "ResidentialPartOfResidentialArea"),
-    ("residentialNonLivingOuterArea", "Суммарная поэтажная площадь жилых объектов (нежилая часть)", "м²", False, "NonResidentialPartOfResidentialArea"),
-    ("nonResidentialOuterArea", "Суммарная поэтажная площадь нежилых объектов", "м²", False, "NonResidentialObjectsArea"),
-    ("totalObjectArea", "Общая площадь объекта", "м²", False, "TotalObjectArea"),
-    ("aboveGroundArea", "Наземная площадь", "м²", False, "AboveGroundArea"),
-    ("undergroundArea", "Подземная площадь", "м²", False, "UndergroundArea"),
-    ("nonResidentialAreaInResidential", "Нежилая наземная площадь, в том числе нежилая часть жилых зданий", "м²", False, "NonResidentialAboveGroundAreaNonResidentialPart"),
-    ("nonResidentialStandaloneArea", "Нежилая наземная площадь, в том числе нежилые объекты", "м²", False, "NonResidentialAboveGroundAreaNonResidentialObjects"),
-    ("apartmentAreaWithoutSummer", "Площадь квартир (без летних помещений)", "м²", False, "ApartmentsAreaExSummerPremises"),
-    ("apartmentCount", "Количество квартир", "шт.", False, "ApartmentsCount"),
-    ("nonResidentialObject", "Нежилой объект", "", False, "NonResidentialObject"),
-    ("landscapingArea", "Площадь озеленения", "м²", False, "GreenArea"),
-    ("playgroundArea", "Площадь детских площадок", "м²", False, "ChildrenPlaygroundArea"),
-    ("adultRecreationArea", "Площадь площадок для отдыха взрослых", "м²", False, "RecreationsArea"),
-    ("objectHeight", "Высота объекта", "м", False, "ObjectHeight"),
-    ("floorCount", "Количество этажей", "шт.", False, "FloorsCount"),
-    ("apartmentArea", "Площадь квартир", "м²", False, "ApartmentsArea"),
-    ("totalApartmentsArea", "Общая площадь квартир", "м²", False, "TotalApartmentsArea"),
-    ("signageCount", "Количество информационных конструкций (вывесок)", "шт.", False, "InformationStructuresCount"),
-    ("signageDetails", "Параметры и содержание информационных конструкций (вывесок)", "", False, "InformationStructuresParameters"),
+    ("totalOuterArea", "Суммарная поэтажная площадь в габаритах наружных стен (всего)", "м²", False, "totalOuterArea"),
+    ("residentialOuterArea", "Суммарная поэтажная площадь в габаритах наружных стен жилых объектов", "м²", False, "residentialOuterArea"),
+    ("residentialLivingOuterArea", "Суммарная поэтажная площадь жилых объектов (жилая часть)", "м²", False, "residentialLivingOuterArea"),
+    ("residentialNonLivingOuterArea", "Суммарная поэтажная площадь жилых объектов (нежилая часть)", "м²", False, "residentialNonLivingOuterArea"),
+    ("totalObjectArea", "Общая площадь объекта", "м²", False, "totalObjectArea"),
+    ("aboveGroundArea", "Наземная площадь", "м²", False, "aboveGroundArea"),
+    ("undergroundArea", "Подземная площадь", "м²", False, "undergroundArea"),
+    ("nonResidentialAreaInResidential", "Нежилая наземная площадь, в том числе нежилая часть жилых зданий", "м²", False, "nonResidentialAreaInResidential"),
+    ("apartmentArea", "Площадь квартир", "м²", False, "apartmentArea"),
+    ("apartmentAreaWithoutSummer", "Площадь квартир (без летних помещений)", "м²", False, "apartmentAreaWithoutSummer"),
+    ("apartmentCount", "Количество квартир", "шт.", False, "apartmentCount"),
+    ("floorCount", "Количество этажей", "шт.", False, "floorCount"),
+    ("totalApartmentsArea", "Общая площадь квартир", "м²", False, "totalApartmentsArea"),
 )
 
 
-def _sum_area_column(df: pd.DataFrame, column: str = "RUS_Area (м²)") -> Decimal | None:
-    """Суммирует поле площади в наборе строк DataFrame."""
+def _sum_by_mask(spaces_df: pd.DataFrame, mask: pd.Series) -> Decimal | None:
+    """Суммирует RUS_Area (м²) по условию (маске).
 
-    if df.empty:
+    :param spaces_df: Общий DataFrame помещений/зон.
+    :param mask: Булева серия, определяющая отобранные строки.
+    :returns: Сумма или None.
+    """
+
+    filtered = spaces_df[mask]
+    if filtered.empty:
         return None
-    values = df[column].dropna()
-    if values.empty:
+    area_values = filtered["RUS_Area (м²)"].dropna()
+    if area_values.empty:
         return None
-    return sum((value for value in values if value is not None), Decimal("0"))
+    return sum((v for v in area_values if v is not None), Decimal("0"))
 
 
-def _filter_space(spaces_df: pd.DataFrame, name: str) -> pd.DataFrame:
-    """Выбирает помещения/зоны по названию."""
+# ============================================================
+# Поля ТЭП — каждая функция принимает spaces_df и считает сумму
+# ============================================================
 
-    return spaces_df[spaces_df["Name"] == name]
+
+def calc_total_outer_area(spaces_df: pd.DataFrame) -> Decimal | None:
+    """Суммарная поэтажная площадь в габаритах наружных стен (всего)."""
+
+    mask = spaces_df["RUS_Name"] == "СПП в ГНС"
+    return _sum_by_mask(spaces_df, mask), "RUS_Name='СПП в ГНС'"
+
+
+def calc_residential_outer_area(spaces_df: pd.DataFrame) -> Decimal | None:
+    """Суммарная поэтажная площадь в габаритах наружных стен жилых объектов."""
+
+    mask = spaces_df["RUS_Name"] == "СПП в ГНС"
+    return _sum_by_mask(spaces_df, mask), "RUS_Name='СПП в ГНС'"
+
+
+def calc_residential_living_outer_area(spaces_df: pd.DataFrame) -> Decimal | None:
+    """Суммарная поэтажная площадь жилых объектов (жилая часть)."""
+
+    mask = (spaces_df["RUS_Name"] == "СПП в ГНС") & (spaces_df["RUS_ResidentalRoom"] == True)
+    return _sum_by_mask(spaces_df, mask), "RUS_Name='СПП в ГНС' + RUS_ResidentalRoom=True"
+
+
+def calc_residential_non_living_outer_area(spaces_df: pd.DataFrame) -> Decimal | None:
+    """Суммарная поэтажная площадь жилых объектов (нежилая часть)."""
+
+    mask = (spaces_df["RUS_Name"] == "СПП в ГНС") & (spaces_df["RUS_ResidentalRoom"] == False)
+    return _sum_by_mask(spaces_df, mask), "RUS_Name='СПП в ГНС' + RUS_ResidentalRoom=False"
+
+
+def calc_total_object_area(spaces_df: pd.DataFrame) -> Decimal | None:
+    """Общая площадь объекта."""
+
+    mask = spaces_df["RUS_Name"] == "Общая площадь"
+    return _sum_by_mask(spaces_df, mask), "RUS_Name='Общая площадь'"
+
+
+def calc_above_ground_area(spaces_df: pd.DataFrame) -> Decimal | None:
+    """Наземная площадь."""
+
+    mask = (spaces_df["RUS_Name"] == "Общая площадь") & (spaces_df["RUS_BasementFloor"] == False)
+    return _sum_by_mask(spaces_df, mask), "RUS_Name='Общая площадь' + RUS_BasementFloor=False"
+
+
+def calc_underground_area(spaces_df: pd.DataFrame) -> Decimal | None:
+    """Подземная площадь."""
+
+    mask = (spaces_df["RUS_Name"] == "Общая площадь") & (spaces_df["RUS_BasementFloor"] == True)
+    return _sum_by_mask(spaces_df, mask), "RUS_Name='Общая площадь' + RUS_BasementFloor=True"
+
+
+def calc_non_residential_area_in_residential(spaces_df: pd.DataFrame) -> Decimal | None:
+    """Нежилая наземная площадь, в том числе нежилая часть жилых зданий."""
+
+    mask = (
+        (spaces_df["RUS_Name"] == "Общая площадь")
+        & (spaces_df["RUS_BasementFloor"] == False)
+        & (spaces_df["RUS_ResidentalRoom"] == False)
+    )
+    return _sum_by_mask(spaces_df, mask), "RUS_Name='Общая площадь' + RUS_BasementFloor=False + RUS_ResidentalRoom=False"
+
+
+def calc_apartment_area(spaces_df: pd.DataFrame) -> Decimal | None:
+    """Площадь квартир."""
+
+    mask = spaces_df["RUS_Group_Type"] == "Квартира"
+    return _sum_by_mask(spaces_df, mask), "RUS_Group_Type='Квартира'"
+
+
+def calc_apartment_area_without_summer(spaces_df: pd.DataFrame) -> Decimal | None:
+    """Площадь квартир (без летних помещений)."""
+
+    summer_zone_names = {"Балкон", "Веранда"}
+    mask = (spaces_df["RUS_Group_Type"] == "Квартира") & (
+        ~spaces_df["RUS_MSSK_SpaceAndZone_Name"].isin(summer_zone_names)
+    )
+    return _sum_by_mask(spaces_df, mask), "RUS_Group_Type='Квартира' + RUS_MSSK_SpaceAndZone_Name not in ('Балкон', 'Веранда')"
+
+
+def calc_apartment_count(spaces_df: pd.DataFrame) -> int | None:
+    """Количество квартир (уникальные RUS_Group_Number, содержащие цифры)."""
+
+    apartment_spaces = spaces_df[spaces_df["RUS_Group_Type"] == "Квартира"]
+    if apartment_spaces.empty:
+        return None, "RUS_Group_Type='Квартира'"
+    # Фильтрую только те Group_Number, которые содержат цифры
+    group_nums = apartment_spaces["RUS_Group_Number"].dropna().astype(str)
+    group_nums_with_digits = group_nums[group_nums.str.contains(r'\d', na=False)]
+    count = group_nums_with_digits.nunique()
+    return int(count) if count > 0 else None, "RUS_Group_Type='Квартира' + RUS_Group_Number содержит цифры"
+
+
+def calc_floor_count(spaces_df: pd.DataFrame) -> int | None:
+    """Количество этажей (уникальные Level, содержащие "основной")."""
+
+    levels = spaces_df["Level"].dropna().astype(str)
+    main_levels = levels[levels.str.contains("основной", na=False)]
+    count = main_levels.nunique()
+    return int(count) if count > 0 else None, "Level содержит 'основной'"
+
+
+def calc_total_apartments_area(spaces_df: pd.DataFrame) -> Decimal | None:
+    """Общая площадь квартир."""
+
+    mask = spaces_df["RUS_Group_Type"] == "Квартира"
+    return _sum_by_mask(spaces_df, mask), "RUS_Group_Type='Квартира'"
+
+
+# ============================================================
+# Таблицы расчётов
+# ============================================================
+
+
+CALCULATION_FUNCTIONS: tuple[tuple[str, str, str, str | None], ...] = (
+    ("totalOuterArea", "Суммарная поэтажная площадь в габаритах наружных стен (всего)", "м²", "totalOuterArea"),
+    ("residentialOuterArea", "Суммарная поэтажная площадь в габаритах наружных стен жилых объектов", "м²", "residentialOuterArea"),
+    ("residentialLivingOuterArea", "Суммарная поэтажная площадь жилых объектов (жилая часть)", "м²", "residentialLivingOuterArea"),
+    ("residentialNonLivingOuterArea", "Суммарная поэтажная площадь жилых объектов (нежилая часть)", "м²", "residentialNonLivingOuterArea"),
+    ("totalObjectArea", "Общая площадь объекта", "м²", "totalObjectArea"),
+    ("aboveGroundArea", "Наземная площадь", "м²", "aboveGroundArea"),
+    ("undergroundArea", "Подземная площадь", "м²", "undergroundArea"),
+    ("nonResidentialAreaInResidential", "Нежилая наземная площадь, в том числе нежилая часть жилых зданий", "м²", "nonResidentialAreaInResidential"),
+    ("apartmentArea", "Площадь квартир", "м²", "apartmentArea"),
+    ("apartmentAreaWithoutSummer", "Площадь квартир (без летних помещений)", "м²", "apartmentAreaWithoutSummer"),
+    ("apartmentCount", "Количество квартир", "шт.", "apartmentCount"),
+    ("floorCount", "Количество этажей", "шт.", "floorCount"),
+    ("totalApartmentsArea", "Общая площадь квартир", "м²", "totalApartmentsArea"),
+)
+
+
+# ============================================================
+# Публичные API
+# ============================================================
 
 
 @log_dataframe
@@ -112,66 +224,49 @@ def calculate_tep(spaces_df: pd.DataFrame) -> pd.DataFrame:
     :returns: DataFrame со всеми полями формы сайта.
     """
 
-    spp = _filter_space(spaces_df, "СПП в ГНС")
-    total = _filter_space(spaces_df, "Общая площадь")
-    residential_spp = spp[spp["RUS_ResidentalRoom"] == True]
-    non_residential_spp = spp[spp["RUS_ResidentalRoom"] == False]
-    above_total = total[total["RUS_BasementFloor"] == False]
-    underground_total = total[total["RUS_BasementFloor"] == True]
-    non_residential_total_above = total[(total["RUS_BasementFloor"] == False) & (total["RUS_ResidentalRoom"] == False)]
-    apartment_spaces = spaces_df[spaces_df["RUS_Group_Type"] == "Квартира"]
-    summer_names = {"Балкон", "Лоджия", "Терраса", "Веранда", "Холодная кладовая", "Тамбур"}
-    apartment_without_summer = apartment_spaces[~apartment_spaces["Name"].isin(summer_names)]
-
-    def calculated(value: Any, unit: str, source: str, comment: str = "") -> TepValue:
-        return TepValue(value, unit, source, "calculated" if value is not None else "missing", comment)
-
-    def unavailable(comment: str) -> TepValue:
-        return TepValue(None, "", "", "unavailable", comment)
-
-    apartment_count = len(set(apartment_spaces["RUS_Group_Number"].dropna().astype(str)))
-
-    values: dict[str, TepValue] = {
-        "ObjectName": unavailable("Требуется метаданные проекта из ifc_project"),
-        "Address": unavailable("Требуется метаданные проекта из ifc_project"),
-        "FunctionalPurpose": unavailable("Требуется метаданные проекта из ifc_project"),
-        "UniqueObjectId": unavailable("Требуется метаданные проекта из ifc_project"),
-        "RegistrationNumber": unavailable("В IFC не найден регистрационный номер"),
-        "Date": unavailable("В IFC не найдена дата формирования сведений"),
-        "CadastralNumber": unavailable("Требуется метаданные проекта из ifc_project"),
-        "ProjectOrganization": unavailable("В IFC нет сведений о проектной организации"),
-        "ProjectTeamLead": unavailable("В IFC нет руководителя авторского коллектива"),
-        "Member": unavailable("В IFC нет состава авторского коллектива"),
-        "WorkTypes": unavailable("В IFC нет вида работ"),
-        "BuildingHeight": unavailable("Требуется высота здания из ifc_project"),
-        "Area": unavailable("Требуется площадь участка из ifc_project"),
-        "TotalFloorArea": calculated(_sum_area_column(spp), "м²", "IfcSpace.Name=СПП в ГНС / RUS_Area (м²)"),
-        "ResidentialPartArea": calculated(_sum_area_column(spp), "м²", "IfcSpace.Name=СПП в ГНС / RUS_Area (м²)", "Жилой объект определяется по RUS_FNO"),
-        "ResidentialPartOfResidentialArea": calculated(_sum_area_column(residential_spp), "м²", "IfcSpace.RUS_ResidentalRoom=true / RUS_Area (м²)"),
-        "NonResidentialPartOfResidentialArea": calculated(_sum_area_column(non_residential_spp), "м²", "IfcSpace.RUS_ResidentalRoom=false / RUS_Area (м²)"),
-        "NonResidentialObjectsArea": unavailable("Для отдельного нежилого объекта нужна соответствующая IFC-модель"),
-        "TotalObjectArea": calculated(_sum_area_column(total), "м²", "IfcSpace.Name=Общая площадь / RUS_Area (м²)"),
-        "AboveGroundArea": calculated(_sum_area_column(above_total), "м²", "IfcSpace.Name=Общая площадь + RUS_BasementFloor=false / RUS_Area (м²)"),
-        "UndergroundArea": calculated(_sum_area_column(underground_total), "м²", "IfcSpace.Name=Общая площадь + RUS_BasementFloor=true / RUS_Area (м²)"),
-        "NonResidentialAboveGroundAreaNonResidentialPart": calculated(_sum_area_column(non_residential_total_above), "м²", "IfcSpace.Name=Общая площадь + RUS_ResidentalRoom=false / RUS_Area (м²)"),
-        "NonResidentialAboveGroundAreaNonResidentialObjects": unavailable("Для отдельного нежилого объекта нужна соответствующая IFC-модель"),
-        "ApartmentsAreaExSummerPremises": calculated(_sum_area_column(apartment_without_summer), "м²", "IfcSpace.RUS_Group_Number + исключение летних помещений"),
-        "ApartmentsCount": calculated(apartment_count or None, "шт.", "уникальные IfcSpace.RUS_Group_Number"),
-        "GreenArea": unavailable("Площадь озеленения находится в ЦИМ БиО"),
-        "ChildrenPlaygroundArea": unavailable("Детские площадки находятся в ЦИМ БиО"),
-        "RecreationsArea": unavailable("Площадки отдыха находятся в ЦИМ БиО"),
-        "ObjectHeight": unavailable("Требуется высота здания из ifc_project"),
-        "FloorsCount": calculated(apartment_count or None, "шт.", "IfcBuildingStorey.Elevation >= 0"),
-        "ApartmentsArea": calculated(_sum_area_column(apartment_spaces), "м²", "IfcSpace.RUS_Group_Number / RUS_Area (м²)"),
-        "TotalApartmentsArea": calculated(_sum_area_column(apartment_spaces), "м²", "IfcSpace.RUS_Group_Number / RUS_Area (м²)"),
-        "InformationStructuresCount": unavailable("В IFC не найдены информационные конструкции"),
-        "InformationStructuresParameters": unavailable("В IFC нет параметров информационных конструкций"),
-        "NonResidentialObject": unavailable("Требуется функциональное назначение из ifc_project"),
+    func_map = {
+        "totalOuterArea": calc_total_outer_area,
+        "residentialOuterArea": calc_residential_outer_area,
+        "residentialLivingOuterArea": calc_residential_living_outer_area,
+        "residentialNonLivingOuterArea": calc_residential_non_living_outer_area,
+        "totalObjectArea": calc_total_object_area,
+        "aboveGroundArea": calc_above_ground_area,
+        "undergroundArea": calc_underground_area,
+        "nonResidentialAreaInResidential": calc_non_residential_area_in_residential,
+        "apartmentArea": calc_apartment_area,
+        "apartmentAreaWithoutSummer": calc_apartment_area_without_summer,
+        "apartmentCount": calc_apartment_count,
+        "floorCount": calc_floor_count,
+        "totalApartmentsArea": calc_total_apartments_area,
     }
+
+    values: dict[str, TepValue] = {}
+    for key, title, unit, _ in CALCULATION_FUNCTIONS:
+        func = func_map[key]
+        result = func(spaces_df)
+        # Функции теперь возвращают (значение, комментарий)
+        value = result[0] if isinstance(result, tuple) else result
+        comment = result[1] if isinstance(result, tuple) else f"Рассчитано через {func.__name__}"
+        unit_str = "" if isinstance(value, int) else unit
+        values[key] = TepValue(
+            value=value,
+            unit=unit_str,
+            source="",
+            status="",
+            comment=comment,
+        )
+
     rows = []
     for form_field, title, unit, optional, source_field in FORM_FIELDS:
-        item = values.get(source_field, unavailable("Поле не извлекается из текущей IFC-модели")) if source_field else unavailable("В IFC не найдено соответствующее поле")
-        rows.append({"field": form_field, "indicator": title, "value": item.value, "unit": item.unit or unit, "source": item.source, "status": item.status, "comment": item.comment, "optional": optional})
+        item = values.get(source_field, TepValue(None, "", "", "", "Поле не рассчитывается"))
+        rows.append({
+            "field": form_field,
+            "indicator": title,
+            "value": item.value,
+            "unit": item.unit or unit,
+            "comment": item.comment,
+            "optional": optional,
+        })
     return pd.DataFrame(rows)
 
 
@@ -184,8 +279,8 @@ def export_tep_excel(tep: pd.DataFrame, output_path: Path) -> Path:
     """
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    export_frame = tep[["field", "indicator", "value", "unit", "source", "status", "comment"]].copy()
-    export_frame.columns = ["Поле формы", "Показатель", "Значение", "Ед. изм.", "Источник IFC", "Статус", "Комментарий"]
+    export_frame = tep[["field", "indicator", "value", "unit", "comment"]].copy()
+    export_frame.columns = ["Поле формы", "Показатель", "Значение", "Ед. изм.", "Способ расчёта"]
     export_frame.to_excel(output_path, index=False, sheet_name="ТЭП")
     workbook = load_workbook(output_path)
     worksheet = workbook["ТЭП"]
